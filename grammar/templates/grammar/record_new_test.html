@@ -1,0 +1,257 @@
+
+{% extends 'based.html' %}
+{%load static %}
+
+{% block title %} 
+    Record
+{% endblock %}
+
+{% block head%}
+{% endblock %}
+
+{% block css %}
+.step {
+  height: 50px;
+  width: 50px;
+  background-color: #bbb;
+  border-radius: 60%;
+  display: inline-block;
+}
+{% endblock %}
+
+
+{% block body %} 
+
+
+<!-- Time Duration  -->
+{% comment %} <div class="row">
+    <div class="days-left position-relative">
+      <div class="days-left-popup"><i class="fa-solid fa-clock"></i> 
+        <span id = 'time'></span>
+      </div>
+    </div>
+</div> {% endcomment %}
+<!-- Time Duration  -->
+
+<div class="container-xl">
+	<div class="row">
+		<div class="col-lg-8 mx-auto">
+			<div id="myCarousel" class="carousel slide" data-ride="carousel" data-interval="false">
+				<div class="carousel-inner">
+            {% for dd in step_data2 %}
+
+              <div class="carousel-item" id = 'step-{{dd.page_no}}'>
+                <div class="days-left position-relative">
+                  <div class="days-left-popup"><i class="fa-solid fa-clock"></i> 
+                    <span id = 'time'> time left{{dd.duration_in_sec}}</span>
+                  </div>
+                </div>
+                <br>
+                
+                {% for data in dd.question %}
+                  <h3 class="testimonial text-center">{{data}}</h3>
+                {% endfor %}
+              </div>
+            {% endfor %}
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<center>
+  <button id="record-start">Start</button>
+  <button onclick="next()" class="nect" id = 'start-text' style = 'display:None;'>Start</button>
+
+  <button id="record-stop" hidden>End</button>
+  <div id="sound-clip"></div>
+</center>
+
+<form method="post" enctype="multipart/form-data" hidden>
+  {% csrf_token %}
+  <input type="file" name="audio-file" id = 'audio-file'>
+  <button type="submit">Submit</button>
+  </form> 
+{% endblock%}
+
+
+
+{% block script-js %}
+<script>
+  
+    var page_number_list  = '{{page_number_list}}';
+    var counter           = 0;
+    page_number_list      = JSON.parse(page_number_list)
+
+    function next(){
+      if (counter<page_number_list.length )
+      {
+            document.getElementsByClassName('nect')[0].innerHTML = 'Next'
+            try {
+              var current           = document.getElementsByClassName(" active");
+              current[0].className  = current[0].className.replace(" active", "");            }
+            catch(err) {};
+
+            id_                     = 'step-'+page_number_list[counter];
+            document.getElementById(id_).className += ' active';
+            counter++;
+      }
+      else if (counter===page_number_list.length )
+      {
+        document.getElementsByClassName('nect')[0].innerHTML = 'Finsh'
+        document.getElementById("record-stop").click();
+        
+        window.location.replace("{% url 'report'%}")
+      }
+
+
+    }
+
+    const audioCtx = new AudioContext();
+
+    let recording = false;
+    let recording_st = 'Start'
+    
+    // Ask user for access to the microphone.
+    if (navigator.mediaDevices) {
+        navigator.mediaDevices.getUserMedia({"audio": true}).then((stream) => {
+        const mediaRecorder = new MediaRecorder(stream);
+        let chunks = [];
+    
+        mediaRecorder.ondataavailable = (event) => {
+          chunks.push(event.data);
+          console.log(chunks);
+          download(chunks);
+    
+        }
+        mediaRecorder.onstop = (event) => {
+          const audio = new Audio();
+          audio.setAttribute("controls", "");
+          $("#sound-clip").append(audio);
+          $("#sound-clip").append("<br />");
+    
+          const blob = new Blob(chunks, {"type": "audio/ogg; codecs=opus"});
+          audio.src = window.URL.createObjectURL(blob);
+          console.log(audio.src )
+          sendAudioFile(blob);
+          chunks = [];
+        };
+    
+    
+        // Set up event handler for the "Record" button.
+        $("#record").on("click", () => {
+          if (recording) {
+            console.log('start recording')
+            // mediaRecorder.stop();
+            mediaRecorder.pause();
+            recording = false;
+            $("#record").html("Start");
+          } else {
+            mediaRecorder.start();
+            recording = true;
+            $("#record").html("Stop");
+          }
+        });
+    
+
+
+
+
+        $("#record-start").on("click", () => {
+            if (recording_st == 'Start'){
+              mediaRecorder.start();
+              console.log('start recording')
+              $("#record-start").html("Pause");
+              recording_st = 'Pause'
+              document.getElementById("start-text").click();
+              document.getElementById("start-text").style.display = "block"; 
+            }
+
+            else if (recording_st == 'Pause'){
+              console.log('pause recording')
+              mediaRecorder.pause();
+              $("#record-start").html("Resume");
+              recording_st = 'Resume'
+            }
+
+            else if (recording_st == 'Resume'){
+              console.log('Resume recording')
+              mediaRecorder.resume();
+              $("#record-start").html("Pause");
+              recording_st = 'Pause'
+            }
+          });
+          
+    
+    
+        $("#record-stop").on("click", () => {
+              mediaRecorder.stop();
+              recording = false;
+              console.log('Stop recording')
+              
+            
+          });
+        /*
+        $("#record-resume").on("click", () => {
+              mediaRecorder.resume();
+              recording = false;
+              console.log('Resume recording')
+    
+            
+          });
+          $("#record-pause").on("click", () => {
+              mediaRecorder.pause();
+              recording = false;
+              console.log('Pause recording')
+          });
+          */
+    
+    
+    
+      }).catch((err) => {
+        alert("Oh no! Your browser cannot access your computer's microphone.");
+      });
+    } else {
+      alert("Oh no! Your browser cannot access your computer's microphone. Please update your browser.");
+    }
+    
+    
+    function download(chunks) {
+      const blob = new Blob(chunks, {
+        type: "audio/ogg" 
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      document.body.appendChild(a);
+    
+      var audio_file_class = 'audio-file';
+    
+      // a.style = "display: block";
+      a.href = url;
+      a.download = "test.mp3";
+      document.getElementById('audio-file').files[0] = url
+      // a.click();
+      window.URL.revokeObjectURL(url);
+    }
+    
+    const sendAudioFile = file => {
+      const formData = new FormData();
+      formData.append('audio-file', file);
+      formData.append('csrfmiddlewaretoken', document.getElementsByName('csrfmiddlewaretoken')[0].value)
+      return fetch('http://localhost:8000/record2/', {
+        method: 'POST',
+        body: formData
+      });
+    };
+</script>
+
+
+
+{% endblock%}
+
+
+<!-- <script src="{% static 'web/microphone/main.js' %}"></script> -->
+
+
+
+
